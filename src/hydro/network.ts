@@ -55,16 +55,13 @@ export function extractNetwork(
     if (main[r] < 0 || acc[c] > acc[main[r]]) main[r] = c;
   }
 
-  // Cells where a lake's drainage leaves the lake (its flood-path exit). This is the lake's spill
-  // cell, except where several rim cells tie for the minimum and the epsilon flood exits elsewhere.
+  // Every lake exits exactly at lake.spill. The lake is treated as the spill's main inflow
+  // (sentinel -2), so an outlet river starts there and outside channel inflows become tributaries.
   const spillLake = new Map<number, number>();
-  if (lakes.length > 0) {
-    for (let c = 0; c < n; c++) {
-      const id = lakeId[c];
-      const r = receivers[c];
-      if (id < 0 || r < 0 || lakeId[r] >= 0 || ocean[r] || !isChannel(r)) continue;
-      if (!spillLake.has(r)) spillLake.set(r, id);
-    }
+  for (const l of lakes) {
+    if (!isChannel(l.spill) || spillLake.has(l.spill)) continue;
+    spillLake.set(l.spill, l.id);
+    main[l.spill] = -2;
   }
 
   const raw: RawPath[] = [];

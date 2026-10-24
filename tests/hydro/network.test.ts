@@ -2,7 +2,7 @@ import { describe, expect, test } from 'vitest';
 import { makeGrid, type Grid } from '../../src/core/grid';
 import { DEFAULT_PARAMS } from '../../src/core/params';
 import { flowAccumulation, flowReceivers, riverThreshold } from '../../src/hydro/flow';
-import { findLakes } from '../../src/hydro/lakes';
+import { findLakes, type Lake } from '../../src/hydro/lakes';
 import { extractNetwork } from '../../src/hydro/network';
 import { labelOcean, outletMask } from '../../src/hydro/ocean';
 import { fillDepressions, fillEpsilon } from '../../src/hydro/priorityFlood';
@@ -116,6 +116,24 @@ describe('extractNetwork', () => {
       while (lakeId[cur] >= 0 && steps++ < lakeId.length) cur = receivers[cur];
       expect(cur).toBe(lakes[0].spill);
     }
+  });
+
+  test('lake outlet river starts at the spill even when a stream enters the spill from outside', () => {
+    // 1-row chain: outside stream 0>1>2(spill)>3>edge; lake cells 5>4>spill
+    const g = makeGrid(6, 1);
+    g.height = 1;
+    const receivers = Int32Array.from([1, 2, 3, -1, 2, 4]);
+    const acc = Float32Array.from([1, 2, 6, 7, 2, 1]);
+    const lakeId = Int32Array.from([-1, -1, -1, -1, 0, 0]);
+    const lake = { id: 0, surface: 1, cellCount: 2, spill: 2, areaM2: 2 } as unknown as Lake;
+    const paths = extractNetwork(g, receivers, acc, lakeId, [lake], new Uint8Array(6), 2);
+    const lakeOut = paths.find((p) => p.source.type === 'lake')!;
+    expect(lakeOut).toBeDefined();
+    expect(lakeOut.cells).toEqual([2, 3]);
+    const trib = paths.find((p) => p.source.type === 'spring')!;
+    expect(trib.cells).toEqual([1, 2]);
+    expect(trib.outlet).toEqual({ type: 'river', id: lakeOut.id, pointIndex: 0 });
+    expect(paths).toHaveLength(2);
   });
 
   test('river into lake stops at first lake cell', () => {
