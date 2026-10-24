@@ -14,7 +14,7 @@ function rasterizeRivers(g: Grid, hydro: HydroResult): Uint8Array {
     for (const q of r.points) {
       const cx = Math.round(q.x / cs);
       const cz = Math.round(q.z / cs);
-      const rad = q.width / 2 / cs;
+      const rad = Number.isFinite(q.width) ? q.width / 2 / cs : 0;
       const reach = Math.ceil(rad);
       const r2 = rad * rad;
       for (let dz = -reach; dz <= reach; dz++) {

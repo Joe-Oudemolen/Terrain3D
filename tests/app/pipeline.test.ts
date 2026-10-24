@@ -196,6 +196,7 @@ describe('Pipeline', () => {
     await r.pl.generate(P);
     expect(r.states.some((s) => s.kind === 'error')).toBe(false);
     expect(r.results).toHaveLength(0);
+    expect(r.states.at(-1)).toEqual({ kind: 'idle' });
   });
 
   test('real failure becomes error state with retry', async () => {
@@ -213,6 +214,139 @@ describe('Pipeline', () => {
     if (err?.kind === 'error') err.retry();
     await vi.advanceTimersByTimeAsync(10);
     expect(r.results).toHaveLength(1);
+  });
+
+  test('concurrent requests share a single initGpu', async () => {
+    let inits = 0;
+    const r = rig(0, {
+      initGpu: async () => {
+        inits++;
+        await new Promise((res) => setTimeout(res, 30));
+        return { device: {} as GPUDevice, lost: new Promise<GPUDeviceLostInfo>(() => {}) };
+      },
+    });
+    void r.pl.generate(P);
+    void r.pl.generate({ ...P, seed: 2 });
+    await vi.advanceTimersByTimeAsync(100);
+    expect(inits).toBe(1);
+    expect(r.results).toHaveLength(1);
+  });
+
+  test('device lost while idle is silent and the next request re-inits', async () => {
+    const r = rig(0);
+    await r.pl.generate(P);
+    const n = r.states.length;
+    r.lost();
+    await vi.advanceTimersByTimeAsync(10);
+    expect(r.states).toHaveLength(n);
+    await r.pl.generate(P);
+    expect(r.calls.init).toBe(2);
+    expect(r.results).toHaveLength(2);
+  });
+
+  test('device lost during export -> error, retry re-runs export', async () => {
+    let first = true;
+    const r = rig(0, {
+      exportBundle: async () => {
+        if (first) {
+          first = false;
+          await new Promise((res) => setTimeout(res, 50));
+        }
+        return { clampedPixels: 0 };
+      },
+    });
+    await r.pl.generate(P);
+    const e = r.pl.export();
+    await vi.advanceTimersByTimeAsync(10);
+    r.lost();
+    await vi.advanceTimersByTimeAsync(100);
+    await e;
+    const err = r.states.at(-1);
+    expect(err).toMatchObject({ kind: 'error', message: 'GPU was reset. Click retry.' });
+    if (err?.kind === 'error') err.retry();
+    await vi.advanceTimersByTimeAsync(10);
+    expect(r.calls.init).toBe(2);
+    expect(r.states.at(-1)).toEqual({ kind: 'idle' });
+  });
+
+  test('a pending preview timer does not kill an export; it is deferred and runs afterwards', async () => {
+    let aborted = false;
+    const r = rig(0, {
+      exportBundle: async (_c, _h, _p, _s, o) => {
+        await new Promise((res) => setTimeout(res, 300));
+        aborted = !!o.signal?.aborted;
+        return { clampedPixels: 0 };
+      },
+    });
+    const notes: string[] = [];
+    r.pl.onNotice((m) => notes.push(m));
+    await r.pl.generate({ ...P, seed: 1 });
+    r.pl.preview({ ...P, seed: 5 });
+    const e = r.pl.export();
+    await vi.advanceTimersByTimeAsync(200); // timer fires mid-export
+    expect(r.results).toHaveLength(1);
+    await vi.advanceTimersByTimeAsync(200);
+    await e;
+    expect(aborted).toBe(false);
+    expect(notes).toEqual(['Export in progress; changes will apply afterwards.']);
+    await vi.advanceTimersByTimeAsync(10);
+    expect(r.results.map((x) => [x.kind, x.params.seed])).toEqual([
+      ['generate', 1],
+      ['preview', 5],
+    ]);
+  });
+
+  test('generate during export is deferred and runs after the export', async () => {
+    const r = rig(0, {
+      exportBundle: async () => {
+        await new Promise((res) => setTimeout(res, 50));
+        return { clampedPixels: 0 };
+      },
+    });
+    await r.pl.generate({ ...P, seed: 1 });
+    const e = r.pl.export();
+    await vi.advanceTimersByTimeAsync(5);
+    await r.pl.generate({ ...P, seed: 2 });
+    r.pl.preview({ ...P, seed: 3 });
+    expect(r.results).toHaveLength(1);
+    await vi.advanceTimersByTimeAsync(100);
+    await e;
+    await vi.advanceTimersByTimeAsync(10);
+    expect(r.results.map((x) => [x.kind, x.params.seed])).toEqual([
+      ['generate', 1],
+      ['generate', 3],
+    ]);
+  });
+
+  test('sink is aborted when the run goes stale after the picker', async () => {
+    let aborted = 0;
+    let release!: () => void;
+    const r = rig(0, {
+      openSaveSink: () =>
+        new Promise((res) => {
+          release = () =>
+            res({ write: async () => {}, close: async () => {}, abort: async () => void aborted++ });
+        }),
+    });
+    await r.pl.generate(P);
+    const e = r.pl.export();
+    await vi.advanceTimersByTimeAsync(5);
+    r.pl.cancel();
+    release();
+    await vi.advanceTimersByTimeAsync(5);
+    await e;
+    expect(aborted).toBe(1);
+    expect(r.calls.exp).toBe(0);
+  });
+
+  test('a throwing result listener is not a pipeline error', async () => {
+    const r = rig(0);
+    r.pl.onResult(() => {
+      throw new Error('listener');
+    });
+    await expect(r.pl.generate(P)).rejects.toThrow('listener');
+    expect(r.states.some((s) => s.kind === 'error')).toBe(false);
+    expect(r.states.at(-1)).toEqual({ kind: 'idle' });
   });
 
   test('cancel aborts and returns to idle', async () => {
