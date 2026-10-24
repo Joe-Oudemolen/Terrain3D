@@ -1,5 +1,5 @@
 import type { Grid } from '../core/grid';
-import type { TerrainParams } from '../core/params';
+import { clampParams, type TerrainParams } from '../core/params';
 import type { ExportOptions } from '../export/exporter';
 import type { ByteSink } from '../export/sink';
 import type { GpuContext } from '../gpu/device';
@@ -100,9 +100,10 @@ export class Pipeline {
   }
 
   /** Exports the last successful generate (its params and hydrology), not the current panel params. */
-  async export(): Promise<void> {
+  async export(output?: Pick<TerrainParams, 'outputSpacing' | 'tileSize' | 'heightFormat'>): Promise<void> {
     if (this.busy === 'generate' || this.busy === 'export' || !this.last) return;
-    const { params, hydro } = this.last;
+    const { hydro } = this.last;
+    const params = output ? clampParams({ ...this.last.params, outputSpacing: output.outputSpacing, tileSize: output.tileSize, heightFormat: output.heightFormat }) : this.last.params;
     const request = () => this.runExport(params, hydro);
     this.lastRequest = request;
     await request();

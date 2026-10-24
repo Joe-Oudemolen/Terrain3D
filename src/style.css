@@ -1,0 +1,34 @@
+:root { font-family: Inter, 'Segoe UI', sans-serif; color: #e7ece9; background: #17242c; color-scheme: dark; }
+* { box-sizing: border-box; }
+body { margin: 0; overflow: hidden; }
+button, textarea { font: inherit; }
+button { cursor: pointer; color: #edf3ed; background: #33443f; border: 1px solid #63786a; border-radius: 5px; padding: 7px 11px; }
+button:hover { background: #4a5d50; }
+button:focus-visible, textarea:focus-visible { outline: 2px solid #ffce78; outline-offset: 2px; }
+[hidden] { display: none !important; }
+#app, #scene { position: absolute; inset: 0; }
+#scene { bottom: 42px; }
+#scene canvas { display: block; }
+header { position: absolute; top: 30px; left: 32px; pointer-events: none; text-shadow: 0 2px 12px #0008; }
+.eyebrow { font-size: 11px; font-weight: 700; letter-spacing: .24em; color: #d0d9ab; }
+h1 { font-size: clamp(22px, 3vw, 36px); font-weight: 500; letter-spacing: -.04em; margin: 7px 0; }
+header p { color: #aabbb9; margin: 0; font-size: 12px; }
+#settings { position: absolute; right: 22px; top: 22px; width: 290px; max-height: calc(100dvh - 100px); overflow-y: auto; border: 1px solid #6d817744; border-radius: 9px; background: #182520ed; box-shadow: 0 16px 50px #0005; padding: 8px; --tp-base-background-color: #0000; --tp-base-font-family: 'Segoe UI', sans-serif; --tp-base-font-size: 12px; --tp-input-background-color: #34433b; --tp-button-background-color: #c4d5b0; --tp-button-foreground-color: #1b2a20; }
+.preset-box { display: flex; gap: 6px; padding: 7px 3px; }
+textarea { width: 155px; min-height: 42px; resize: vertical; border: 1px solid #607563; border-radius: 4px; background: #17241e; color: #eee; font-size: 11px; }
+.preset-box button { font-size: 11px; }
+#inset { position: absolute; bottom: 64px; left: 24px; width: 250px; height: 270px; min-width: 170px; min-height: 190px; max-width: 50vw; max-height: 50vh; resize: both; overflow: hidden; border: 1px solid #b4c5b466; border-radius: 9px; background: #17242c; box-shadow: 0 8px 30px #0006; }
+#swap { height: 30px; width: 100%; border: none; border-radius: 0; text-align: left; font-size: 11px; padding: 5px 10px; }
+#inset-content { position: absolute; inset: 30px 0 0; }
+.minimap { position: relative; width: 100%; height: 100%; }
+.minimap canvas { width: 100%; height: 100%; display: block; cursor: pointer; }
+.water-toggle { position: absolute; bottom: 10px; right: 10px; font-size: 11px; background: #1b302bdd; }
+#status { position: absolute; left: 50%; bottom: 66px; transform: translateX(-50%); width: min(420px, 80vw); }
+.state, .notice { padding: 14px; margin-top: 8px; border: 1px solid #7e938566; background: #15231fed; border-radius: 8px; font-size: 13px; box-shadow: 0 8px 30px #0004; }
+.state:empty { display: none; }
+.state span { display: block; margin-bottom: 9px; }
+progress { width: calc(100% - 85px); accent-color: #b6d69f; margin-right: 12px; }
+.notice { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+footer { position: absolute; bottom: 0; left: 0; right: 0; min-height: 42px; padding: 13px 24px; background: #15231ee6; border-top: 1px solid #9daf9d33; display: flex; justify-content: space-between; gap: 15px; font-size: 11px; color: #b6c4bd; }
+.unavailable { max-width: 650px; margin: 20vh auto; padding: 32px; }
+@media (max-width: 700px) { header { top: 14px; left: 16px; } header p { display: none; } #settings { top: 100px; right: 10px; width: 240px; max-height: 60vh; } #inset { left: 10px; width: 175px; height: 195px; } footer span:last-child { display: none; } #status { bottom: 54px; } }

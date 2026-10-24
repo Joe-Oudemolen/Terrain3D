@@ -21,6 +21,7 @@
     "tweakpane": "^4.0.5"
   },
   "devDependencies": {
+    "@tweakpane/core": "^2.0.5",
     "@types/pngjs": "^6.0.5",
     "@types/three": "^0.186.0",
     "@vitest/browser-playwright": "^5.0.5",

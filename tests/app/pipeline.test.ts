@@ -63,6 +63,14 @@ beforeEach(() => vi.useFakeTimers());
 afterEach(() => vi.useRealTimers());
 
 describe('Pipeline', () => {
+  test('export uses current output options but retains the generated terrain parameters', async () => {
+    let exported: typeof P | undefined;
+    const r = rig(0, { exportBundle: async (_ctx, _hydro, p) => { exported = p; return { clampedPixels: 0 }; } });
+    await r.pl.generate({ ...P, seed: 7 });
+    const current: typeof P = { ...P, seed: 99, outputSpacing: 2, tileSize: 512, heightFormat: 'r16' };
+    await r.pl.export(current);
+    expect(exported).toMatchObject({ seed: 7, outputSpacing: 2, tileSize: 512, heightFormat: 'r16' });
+  });
   test('latest request wins', async () => {
     const r = rig();
     const a = r.pl.generate({ ...P, seed: 1 });
