@@ -4,7 +4,7 @@ import type { HydroMessage, HydroRequest } from './hydro.worker';
 import type { HydroResult } from './hydrology';
 
 /**
- * Runs hydrology in a module worker. `base.data` is transferred (detached on the calling side).
+ * Runs hydrology in a module worker. A copy of `base.data` is transferred, so the caller's `base` is left untouched.
  * Aborting terminates the worker and rejects with an AbortError.
  */
 export function runHydrologyInWorker(
@@ -44,7 +44,8 @@ export function runHydrologyInWorker(
       finish();
       reject(new Error(e.message || 'Hydrology worker failed'));
     };
-    const req: HydroRequest = { base, params: p };
-    worker.postMessage(req, [base.data.buffer]);
+    const copy: Grid = { ...base, data: base.data.slice() };
+    const req: HydroRequest = { base: copy, params: p };
+    worker.postMessage(req, [copy.data.buffer]);
   });
 }
