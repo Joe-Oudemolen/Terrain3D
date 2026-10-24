@@ -1,0 +1,35 @@
+{
+  "name": "terrain-generator",
+  "version": "0.1.0",
+  "description": "",
+  "directories": {
+    "doc": "docs"
+  },
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "test": "vitest run --project node",
+    "test:gpu": "vitest run --project gpu"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "module",
+  "dependencies": {
+    "fflate": "^0.8.3",
+    "three": "^0.186.1",
+    "tweakpane": "^4.0.5"
+  },
+  "devDependencies": {
+    "@types/pngjs": "^6.0.5",
+    "@types/three": "^0.186.0",
+    "@vitest/browser-playwright": "^5.0.5",
+    "@webgpu/types": "^0.1.74",
+    "playwright": "^1.64.1",
+    "pngjs": "^7.0.0",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.5",
+    "vitest": "^5.0.5"
+  },
+  "private": true
+}
