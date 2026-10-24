@@ -7,6 +7,37 @@ const DZ = [-1, -1, -1, 0, 0, 1, 1, 1];
 const INV_DIST = [Math.SQRT1_2, 1, Math.SQRT1_2, 1, 1, Math.SQRT1_2, 1, Math.SQRT1_2];
 
 /**
+ * Re-chooses each lake's spill on the epsilon-filled surface: the cell outside the lake,
+ * 8-adjacent to it, with the lowest `surface` value (ties: smallest index). The plain-fill spill
+ * from findLakes can sit on a flat the epsilon flood leaves elsewhere, so it may drain back into
+ * its own lake. The minimum cannot: if its lower receiver were a lake cell, that cell's strict
+ * descent would leave the lake through an even lower adjacent outside cell. Mutates `lakes`.
+ */
+export function resolveSpills(lakes: Lake[], lakeId: Int32Array, surface: Float32Array, g: Grid): void {
+  if (lakes.length === 0) return;
+  const { width: w, height: hgt } = g;
+  const byId = new Map(lakes.map((l) => [l.id, l]));
+  const best = new Map<number, number>();
+  for (let c = 0; c < w * hgt; c++) {
+    const id = lakeId[c];
+    if (id < 0 || !byId.has(id)) continue;
+    const x = c % w;
+    const z = (c - x) / w;
+    let b = best.get(id) ?? -1;
+    for (let k = 0; k < 8; k++) {
+      const nx = x + DX[k];
+      const nz = z + DZ[k];
+      if (nx < 0 || nz < 0 || nx >= w || nz >= hgt) continue;
+      const ni = nz * w + nx;
+      if (lakeId[ni] === id) continue;
+      if (b < 0 || surface[ni] < surface[b] || (surface[ni] === surface[b] && ni < b)) b = ni;
+    }
+    best.set(id, b);
+  }
+  for (const [id, b] of best) if (b >= 0) byId.get(id)!.spill = b;
+}
+
+/**
  * D8 steepest descent. Outlets get -1. Ties are broken by the lowest neighbour cell index.
  * On the epsilon-filled surface every non-outlet, non-lake cell has a strictly lower neighbour.
  * Lake cells are routed explicitly: all of a lake's outflow follows a BFS tree through the lake

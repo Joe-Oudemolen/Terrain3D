@@ -1,12 +1,12 @@
 import { describe, expect, test } from 'vitest';
 import { makeGrid, type Grid } from '../../src/core/grid';
 import { DEFAULT_PARAMS } from '../../src/core/params';
-import { flowAccumulation, flowReceivers, riverThreshold } from '../../src/hydro/flow';
+import { flowAccumulation, flowReceivers, resolveSpills, riverThreshold } from '../../src/hydro/flow';
 import { findLakes, type Lake } from '../../src/hydro/lakes';
 import { extractNetwork } from '../../src/hydro/network';
 import { labelOcean, outletMask } from '../../src/hydro/ocean';
 import { fillDepressions, fillEpsilon } from '../../src/hydro/priorityFlood';
-import { bowlGrid, loadF32 } from '../helpers/synthetic';
+import { bowlGrid, loadF32, valueNoiseGrid } from '../helpers/synthetic';
 
 function pipeline(g: Grid, thresholdCells: number | null, p = DEFAULT_PARAMS) {
   const ocean = labelOcean(g);
@@ -14,6 +14,7 @@ function pipeline(g: Grid, thresholdCells: number | null, p = DEFAULT_PARAMS) {
   const plain = fillDepressions(g, outlets);
   const { lakeId, lakes } = findLakes(g, plain, ocean, p);
   const surface = fillEpsilon(g.data, g, outlets);
+  resolveSpills(lakes, lakeId, surface, g);
   const receivers = flowReceivers(surface, g, outlets, lakeId, lakes);
   const cs2 = g.cellSize * g.cellSize;
   const acc = flowAccumulation(receivers, surface, cs2, lakeId);
@@ -186,6 +187,22 @@ describe('extractNetwork', () => {
         expect(c).toBeLessThan(n);
       }
       for (let k = 0; k + 1 < p.cells.length; k++) expect(receivers[p.cells[k]]).toBe(p.cells[k + 1]);
+    }
+  });
+  test.each([
+    [256, 40, 300, 11],
+    [256, 40, 300, 19],
+    [256, 40, 300, 22],
+    [128, 20, 100, 5],
+    [128, 20, 100, 10],
+    [128, 20, 100, 16],
+    [128, 20, 100, 23],
+  ])('regression: value noise %i/%i/%i seed %i spills never drain back into their lake', (size, cs, amp, seed) => {
+    const { lakes, lakeId, receivers } = pipeline(valueNoiseGrid(seed, size, cs, amp), null);
+    expect(lakes.length).toBeGreaterThan(0);
+    for (const l of lakes) {
+      expect(lakeId[l.spill]).not.toBe(l.id);
+      expect(receivers[l.spill] < 0 || lakeId[receivers[l.spill]] !== l.id).toBe(true);
     }
   });
 });
