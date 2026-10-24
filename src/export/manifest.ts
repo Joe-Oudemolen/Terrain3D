@@ -5,8 +5,8 @@ import { tileFileName, tileOrigin, type TileLayout } from '../core/tiles';
 import type { Lake } from '../hydro/lakes';
 import type { River } from '../hydro/riverGeometry';
 
-/** Set by Task 13 once the import script has been checked against a real Terrain3D release. */
-export const TERRAIN3D_VERSION = 'unverified';
+/** Terrain3D release the import script was verified against (Godot 4.7.2). */
+export const TERRAIN3D_VERSION = '1.0.2';
 
 export interface WorldJson {
   version: 1;
@@ -95,9 +95,16 @@ export function buildReadme(w: WorldJson, terrain3dVersion: string): string {
     `  Target Terrain3D version: ${terrain3dVersion}`,
     '',
     'Import',
-    '  1. Add a Terrain3D node, set vertex_spacing and region_size as above.',
-    '  2. Run godot/terrain3d_import.gd (or use Terrain3D > Tools > Import) with world.json.',
-    '  3. Each heights/ tile goes at the position listed in world.json; origin is (0, 0, 0).',
+    '  1. Unzip this bundle into your Godot project (e.g. res://terrain_bundle/).',
+    '  2. Add a Terrain3D node to a scene and select it. vertex_spacing and region_size are set by the script.',
+    '  3. Open godot/terrain3d_import.gd in the Script editor and choose File > Run (Ctrl+Shift+X).',
+    '     It reads world.json and imports every height tile at its listed position.',
+    '  4. Set the Terrain3D data directory and save the scene to keep the imported regions.',
+    '',
+    'Coordinates',
+    '  The world corner is at the origin: +x runs along image columns, +z along image rows, sea level is y = 0.',
+    '  Tile positions in world.json are the world-meter origin of each tile; all world.json, lakes.json and',
+    '  rivers.json coordinates are world meters. River channel beds are carved to (water - depth).',
     '',
   ];
   if (w.r16Range) {
@@ -109,7 +116,9 @@ export function buildReadme(w: WorldJson, terrain3dVersion: string): string {
     );
   }
   lines.push(
-    'Other files',
+    'Files',
+    '  heights/*     height tiles (EXR 32-bit float meters, or R16 scaled to the range above).',
+    '  world.json    world size, spacing, tile list and positions, R16 range.',
     '  water/*.png   RGB water masks: R rivers, G lakes, B ocean.',
     '  lakes.json, rivers.json   vector water data (world meters).',
     '  preset.txt    paste into the generator to reproduce this terrain.',
