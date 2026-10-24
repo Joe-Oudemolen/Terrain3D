@@ -86,7 +86,7 @@ export class Pipeline {
     this.timer = setTimeout(() => {
       this.timer = null;
       if (this.busy === 'export') this.defer('preview', params);
-      else void this.start('preview', params);
+      else void this.start('preview', params).catch(() => {});
     }, PREVIEW_DEBOUNCE_MS);
   }
 
@@ -139,7 +139,7 @@ export class Pipeline {
   private flushDeferred(): void {
     const d = this.deferred;
     this.deferred = null;
-    if (d) void this.start(d.kind, d.p);
+    if (d) void this.start(d.kind, d.p).catch(() => {});
   }
 
   /** Single-flight: concurrent callers share one initGpu. */
@@ -162,6 +162,7 @@ export class Pipeline {
     this.ctx = null;
     this.ctxPromise = null;
     if (info?.reason === 'destroyed') return;
+    this.deferred = null;
     if (!this.busy) return; // idle: the next request re-inits
     this.generation++;
     this.abort?.abort();
@@ -190,6 +191,7 @@ export class Pipeline {
   private async start(kind: 'preview' | 'generate', p: TerrainParams): Promise<void> {
     if (this.timer) clearTimeout(this.timer);
     this.timer = null;
+    this.deferred = null;
     this.abort?.abort();
     const gen = ++this.generation;
     const ac = new AbortController();
@@ -276,8 +278,8 @@ export class Pipeline {
       if (stale()) return;
       if (isAbort(e)) this.settleAbort();
       else {
+        this.deferred = null; // keep the error and retry visible
         this.fail(e, () => this.runExport(params, hydro));
-        this.flushDeferred();
       }
       return;
     }

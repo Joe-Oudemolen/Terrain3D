@@ -318,6 +318,51 @@ describe('Pipeline', () => {
     ]);
   });
 
+  test('deferred input is dropped on device lost; no stale replay after a fresh request', async () => {
+    let slow = true;
+    const r = rig(0, {
+      exportBundle: async () => {
+        if (slow) {
+          slow = false;
+          await new Promise((res) => setTimeout(res, 50));
+        }
+        return { clampedPixels: 0 };
+      },
+    });
+    await r.pl.generate({ ...P, seed: 1 });
+    const e = r.pl.export();
+    await vi.advanceTimersByTimeAsync(5);
+    r.pl.preview({ ...P, seed: 9 }); // deferred
+    r.lost();
+    await vi.advanceTimersByTimeAsync(100);
+    await e;
+    await r.pl.generate({ ...P, seed: 2 });
+    await r.pl.export();
+    await vi.advanceTimersByTimeAsync(10);
+    expect(r.results.map((x) => [x.kind, x.params.seed])).toEqual([
+      ['generate', 1],
+      ['generate', 2],
+    ]);
+  });
+
+  test('export error with deferred input keeps the error visible and does not replay', async () => {
+    const r = rig(0, {
+      exportBundle: async () => {
+        await new Promise((res) => setTimeout(res, 20));
+        throw new Error('disk full');
+      },
+    });
+    await r.pl.generate({ ...P, seed: 1 });
+    const e = r.pl.export();
+    await vi.advanceTimersByTimeAsync(5);
+    r.pl.preview({ ...P, seed: 9 });
+    await vi.advanceTimersByTimeAsync(50);
+    await e;
+    await vi.advanceTimersByTimeAsync(200);
+    expect(r.states.at(-1)).toMatchObject({ kind: 'error', message: 'disk full' });
+    expect(r.results).toHaveLength(1);
+  });
+
   test('sink is aborted when the run goes stale after the picker', async () => {
     let aborted = 0;
     let release!: () => void;
