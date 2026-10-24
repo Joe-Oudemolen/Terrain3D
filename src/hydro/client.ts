@@ -46,6 +46,11 @@ export function runHydrologyInWorker(
     };
     const copy: Grid = { ...base, data: base.data.slice() };
     const req: HydroRequest = { base: copy, params: p };
-    worker.postMessage(req, [copy.data.buffer]);
+    try {
+      worker.postMessage(req, [copy.data.buffer]);
+    } catch (err) {
+      finish();
+      reject(err instanceof Error ? err : new Error(String(err)));
+    }
   });
 }

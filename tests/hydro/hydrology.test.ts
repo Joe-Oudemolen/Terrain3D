@@ -23,16 +23,46 @@ describe('runHydrology', () => {
   });
 
   test('degenerate settings', () => {
+    const finite = (r: ReturnType<typeof runHydrology>) => {
+      for (const a of [r.terrain.data, r.detailMask.data]) expect(a.every(Number.isFinite)).toBe(true);
+      expect(r.detailMask.data.every((v) => v >= 0 && v <= 1)).toBe(true);
+      for (const l of r.lakes) expect(Number.isFinite(l.surface)).toBe(true);
+      for (const rv of r.rivers) for (const pt of rv.points) expect(Number.isFinite(pt.water)).toBe(true);
+    };
     const f = fixtures[0];
-    expect(runHydrology(f, clampParams({ rainfall: 0 })).rivers).toEqual([]);
-    const sea = makeGrid(64, 20);
-    sea.data.set(f.data.subarray(0, 64 * 64));
-    expect(() => runHydrology(sea, clampParams({ seaLevel: 0.5, mountainHeight: 100 }))).not.toThrow();
-    const flat = makeGrid(64, 20);
-    const r = runHydrology(flat, clampParams({ flatland: 1 }));
-    expect(r.lakes).toEqual([]);
-    expect(r.rivers).toEqual([]);
-    for (const a of [r.terrain.data, r.detailMask.data]) expect(a.every(Number.isFinite)).toBe(true);
+
+    // rainfall 0: no rivers; lakes are not rainfall-driven, so only validity is asserted.
+    const dry = runHydrology(f, clampParams({ rainfall: 0 }));
+    expect(dry.rivers).toEqual([]);
+    expect(Array.isArray(dry.lakes)).toBe(true);
+    finite(dry);
+
+    // mostly-ocean map: the real fixture lowered so nearly everything is at or below 0.
+    let max = -Infinity;
+    for (const v of f.data) max = Math.max(max, v);
+    const sunk = makeGrid(f.width, f.cellSize);
+    for (let i = 0; i < sunk.data.length; i++) sunk.data[i] = f.data[i] - max * 0.9;
+    const sea = runHydrology(sunk, clampParams({ seaLevel: 0.5, mountainHeight: 100 }));
+    let oceanCells = 0;
+    for (const o of sea.ocean) oceanCells += o;
+    expect(oceanCells / sea.ocean.length).toBeGreaterThan(0.5);
+    expect(Array.isArray(sea.rivers)).toBe(true);
+    expect(Array.isArray(sea.lakes)).toBe(true);
+    finite(sea);
+
+    // island on a tiny map
+    for (const size of [16, 64]) {
+      const tiny = runHydrology(makeGrid(size, 20), clampParams({ island: true }));
+      expect(Array.isArray(tiny.rivers)).toBe(true);
+      expect(Array.isArray(tiny.lakes)).toBe(true);
+      finite(tiny);
+    }
+
+    // flat grid of zeros
+    const flat = runHydrology(makeGrid(64, 20), clampParams({ flatland: 1 }));
+    expect(flat.lakes).toEqual([]);
+    expect(flat.rivers).toEqual([]);
+    finite(flat);
   });
 
   test('terrain >= original except lake beds equal original', () => {
