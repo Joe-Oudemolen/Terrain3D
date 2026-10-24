@@ -107,14 +107,14 @@ export async function erode(
   hf32[12] = D_MIN;
   hf32[13] = MAX_ERODE_PER_M * l;
   // Hillslope diffusivity D in m^2/s; D*dt/l^2 <= 0.2 stays stable even at 4096 (l = 2.5 m).
-  hf32[14] = (lerp(1, 10, p.thermalSmoothing) * dt) / (l * l);
+  hf32[14] = (10 * p.thermalSmoothing * dt) / (l * l);
 
   const thermalU = new ArrayBuffer(16);
   new Uint32Array(thermalU)[0] = n;
   const tf32 = new Float32Array(thermalU);
   tf32[1] = l;
   tf32[2] = lerp(0.9, 0.35, p.thermalSmoothing); // talus slope: 42 deg .. 19 deg
-  tf32[3] = THERMAL_RATE;
+  tf32[3] = THERMAL_RATE * p.thermalSmoothing;
 
   const buffers: GPUBuffer[] = [];
   const track = (b: GPUBuffer) => (buffers.push(b), b);

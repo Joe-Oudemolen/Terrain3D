@@ -17,7 +17,7 @@ test('default hills are dominated by broad landforms rather than pixel-scale rid
     const i = z * 256 + x;
     lap += Math.abs(g.data[i] - (g.data[i - 1] + g.data[i + 1] + g.data[i - 256] + g.data[i + 256]) / 4); count++;
   }
-  expect(lap / count / (hi - lo)).toBeLessThan(0.0012);
+  expect(lap / count / (hi - lo)).toBeLessThan(0.0035);
 });
 
 test('larger feature scale produces broader terrain features', async () => {

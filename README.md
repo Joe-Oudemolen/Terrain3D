@@ -22,7 +22,9 @@ Open the local address printed by Vite. The tool runs locally; terrain and prese
 5. Use **Copy preset** and the preset text box to reproduce settings. Invalid presets leave existing settings intact.
 6. **Reset defaults** restores the seed, terrain, water, quality and export controls, saves them, and starts a fresh rough preview. It also discards queued work and the previous export result; press Generate before exporting again.
 
-Defaults favor rolling hills and wide valleys: 650 m elevation scale, 4 km features, reduced ruggedness and ridge sharpness, and more flatland. Larger feature-scale values create broader landforms. Wet lake outlets follow downhill drainage to lower lakes, ocean, the map edge or a larger river even when they fall below the ordinary stream threshold. Rainfall zero disables rivers.
+Defaults balance broad valleys with pronounced spurs and knolls: 1000 m elevation scale, 3 km features, ruggedness 0.5, ridge sharpness 0.55 and flatland 0.25. Medium-scale nested ridges add variation to valley walls and uplands. Lower default thermal smoothing (0.2) and deposition preserve this relief through erosion. Larger feature-scale values create broader landforms. Wet lake outlets follow downhill drainage to lower lakes, ocean, the map edge or a larger river even when they fall below the ordinary stream threshold. Rainfall zero disables rivers.
+
+Thermal smoothing at zero now disables both hillslope diffusion and thermal material transfer. Turn erosion strength off as well to preserve the initial shape. Landform regression tests check retained medium-scale relief through erosion and hydrology as well as an upper bound on pixel-scale roughness.
 
 The 3D view uses muted land colors and a continuous river overlay; the map retains grayscale heights. Preview river lines have a minimum visible footprint. Exported river widths and water masks retain their world-meter scale. These preview land colors are not exported as terrain textures.
 

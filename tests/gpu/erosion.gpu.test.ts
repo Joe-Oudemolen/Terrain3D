@@ -10,6 +10,13 @@ const ctx = await initGpu();
 const N = 256;
 const base = await generateTerrain(ctx, DEFAULT_PARAMS, N);
 
+test('zero erosion strength and zero thermal smoothing preserve the input relief', async () => {
+  const out = await erode(ctx, base, { ...DEFAULT_PARAMS, erosionStrength: 0, thermalSmoothing: 0 });
+  let maxChange = 0;
+  for (let i = 0; i < out.data.length; i++) maxChange = Math.max(maxChange, Math.abs(out.data[i] - base.data[i]));
+  expect(maxChange).toBeLessThan(1e-4);
+});
+
 const sum = (g: Grid) => g.data.reduce((s, v) => s + v, 0);
 
 test('erode is deterministic and leaves the input untouched', async () => {

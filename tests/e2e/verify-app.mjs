@@ -36,7 +36,7 @@ try {
   await page.getByRole('button', { name: 'Reset defaults', exact: true }).click();
   await page.waitForFunction(() => document.querySelector('#result-label')?.textContent?.startsWith('Rough preview'));
   assert.equal(await page.getByRole('button', { name: 'Export bundle', exact: true }).isDisabled(), true);
-  assert.equal(await page.evaluate(() => JSON.parse(atob(localStorage.getItem('terrain-gen:params').replace(/-/g, '+').replace(/_/g, '/'))).mountainHeight), 650);
+  assert.equal(await page.evaluate(() => JSON.parse(atob(localStorage.getItem('terrain-gen:params').replace(/-/g, '+').replace(/_/g, '/'))).mountainHeight), 1000);
   await page.getByRole('button', { name: 'Dismiss notice' }).click();
   start = performance.now();
   await page.getByRole('button', { name: 'Generate terrain', exact: true }).click();
