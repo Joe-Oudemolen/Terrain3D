@@ -59,28 +59,39 @@ export function tileSegments(l: TileLayout, tx: number, tz: number, idx: RiverIn
 /** Margin for tile queries: generous bound on any segment's reach (widths are a few tens of meters at most). */
 export const QUERY_MARGIN_M = 128;
 
+/** Rounded shoulders around a flat pixel footprint at the bottom of the channel. */
+export function channelProfile(s: Segment, d: number, t: number, spacing: number): number {
+  const width = s.widthA + (s.widthB - s.widthA) * t;
+  const core = spacing * Math.SQRT1_2;
+  const half = Math.max(width / 2, core * 1.01);
+  if (d > half + bevelFor(width, spacing)) return Infinity;
+  const water = s.waterA + (s.waterB - s.waterA) * t;
+  if (d > half) return water + (d - half) * BANK_SLOPE;
+  const u = Math.max(0, (d - core) / (half - core));
+  const depth = s.depthA + (s.depthB - s.depthA) * t;
+  return water - depth * (1 - u * u);
+}
+
 /**
  * Carves rivers into a full-res tile in place; only ever lowers. Depends only on world position and
  * the global river data, so neighbouring tiles agree exactly at shared pixels. The bed is the minimum
  * profile over all nearby segments.
  */
-export function carveTile(h: Float32Array, l: TileLayout, tx: number, tz: number, idx: RiverIndex): void {
+export function carveTile(h: Float32Array, l: TileLayout, tx: number, tz: number, idx: RiverIndex, floor?: ReadonlyMap<number, number>): void {
   const sp = l.spacing;
   for (const s of tileSegments(l, tx, tz, idx, QUERY_MARGIN_M)) {
     forEachSegmentPixel(s, l, tx, tz, segmentReach(s, sp), (i, d, t) => {
-      const width = s.widthA + (s.widthB - s.widthA) * t;
-      const half = width / 2;
-      if (d > half + bevelFor(width, sp)) return;
-      const water = s.waterA + (s.waterB - s.waterA) * t;
-      let profile: number;
-      if (d <= half) {
-        const u = d / half;
-        const depth = s.depthA + (s.depthB - s.depthA) * t;
-        profile = water - depth * (1 - u * u);
-      } else {
-        profile = water + (d - half) * BANK_SLOPE;
-      }
+      const profile = channelProfile(s, d, t, sp);
       if (profile < h[i]) h[i] = profile;
     });
+  }
+  if (floor) {
+    const ox = tx * l.tileSize, oz = tz * l.tileSize;
+    for (const [key, height] of floor) {
+      const x = key % l.pixels - ox, z = Math.floor(key / l.pixels) - oz;
+      if (x >= 0 && z >= 0 && x < l.tileSize && z < l.tileSize) {
+        const i = z * l.tileSize + x; h[i] = Math.min(h[i], height);
+      }
+    }
   }
 }

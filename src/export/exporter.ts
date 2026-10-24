@@ -3,6 +3,8 @@ import { tileLayout } from '../core/tiles';
 import type { GpuContext } from '../gpu/device';
 import { buildTileHeights, DETAIL_PEAK, detailAmplitude, releaseTileCache } from '../gpu/detail';
 import type { HydroResult } from '../hydro/hydrology';
+import { buildChannelFloor } from '../tile/channelFloor';
+import { buildRiverIndex } from '../tile/riverIndex';
 import godotScript from '../../godot/terrain3d_import.gd?raw';
 import type { ExportMessage, ExportRequest } from './export.worker';
 import { buildLakesJson, buildReadme, buildRiversJson, buildWorldJson, TERRAIN3D_VERSION } from './manifest';
@@ -113,6 +115,7 @@ export async function exportBundle(
 
     const init: ExportRequest = {
       type: 'init',
+      channelFloor: [...buildChannelFloor(hydro.terrain, hydro.rivers, l, buildRiverIndex(hydro.rivers))],
       layout: l,
       format: p.heightFormat,
       r16: range,

@@ -12,6 +12,7 @@ import { encodeR16 } from './r16';
 export type ExportRequest =
   | {
       type: 'init';
+      channelFloor: [number, number][];
       layout: TileLayout;
       format: 'exr' | 'r16';
       r16: { min: number; max: number } | null;
@@ -40,6 +41,7 @@ let format: 'exr' | 'r16';
 let r16: { min: number; max: number } | null;
 let index: RiverIndex;
 let lookup: WaterLookup;
+let channelFloor: Map<number, number>;
 
 const zip = new Zip((err, data, final) => {
   if (err) {
@@ -63,6 +65,7 @@ ctx.onmessage = (e) => {
     const m = e.data;
     if (m.type === 'init') {
       layout = m.layout;
+      channelFloor = new Map(m.channelFloor);
       format = m.format;
       r16 = m.r16;
       index = buildRiverIndex(m.rivers);
@@ -70,7 +73,7 @@ ctx.onmessage = (e) => {
     } else if (m.type === 'tile') {
       const h = m.heights;
       const n = layout.tileSize;
-      carveTile(h, layout, m.tx, m.tz, index);
+      carveTile(h, layout, m.tx, m.tz, index, channelFloor);
       const mask = waterMaskTile(h, layout, m.tx, m.tz, index, lookup);
       let clamped = 0;
       if (format === 'r16') {

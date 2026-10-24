@@ -42,6 +42,14 @@ function hilly(): Float32Array[] {
 }
 
 describe('carveTile', () => {
+  test('subpixel offsets do not introduce uphill steps in a level channel floor', () => {
+    const river = straightRiver(100.3, 100.7, 900.8, 850.2, 6, 2);
+    for (const p of river.points) p.water = 9;
+    const h = new Float32Array(512 * 512).fill(20);
+    carveTile(h, L, 0, 0, buildRiverIndex([river]));
+    const values = river.points.map(p => h[Math.round(p.z / 2) * 512 + Math.round(p.x / 2)]);
+    expect(Math.max(...values) - Math.min(...values)).toBeLessThanOrEqual(1e-3);
+  });
   test('bed at centerline = water - depth', () => {
     const river = straightRiver(100, 1500, 900, 1500);
     const idx = buildRiverIndex([river]);
@@ -57,15 +65,17 @@ describe('carveTile', () => {
     const idx = buildRiverIndex([straightRiver(100, 100, 1800, 1400)]);
     const tiles = hilly();
     let lowered = 0;
+    let maxRise = 0;
     for (let k = 0; k < 4; k++) {
       const before = Float32Array.from(tiles[k]);
       carveTile(tiles[k], L, k % 2, Math.floor(k / 2), idx);
       for (let i = 0; i < before.length; i++) {
-        expect(tiles[k][i]).toBeLessThanOrEqual(before[i]);
+        maxRise = Math.max(maxRise, tiles[k][i] - before[i]);
         if (tiles[k][i] < before[i]) lowered++;
       }
     }
     expect(lowered).toBeGreaterThan(100);
+    expect(maxRise).toBe(0);
   });
 
   test('carving is seam-free', () => {
@@ -82,17 +92,19 @@ describe('carveTile', () => {
     }
     carveTile(bigH, big, 0, 0, idx);
     let carved = 0;
+    let maxDifference = 0;
     for (let k = 0; k < 4; k++) {
       const ox = (k % 2) * 512;
       const oz = Math.floor(k / 2) * 512;
       for (let r = 0; r < 512; r++) {
         for (let c = 0; c < 512; c++) {
-          expect(small[k][r * 512 + c]).toBe(bigH[(oz + r) * 1024 + ox + c]);
+          maxDifference = Math.max(maxDifference, Math.abs(small[k][r * 512 + c] - bigH[(oz + r) * 1024 + ox + c]));
           if (small[k][r * 512 + c] !== src[k][r * 512 + c]) carved++;
         }
       }
     }
     expect(carved).toBeGreaterThan(100);
+    expect(maxDifference).toBe(0);
   });
 
   test('carved bed never uphill along every river (full res)', () => {
