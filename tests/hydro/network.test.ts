@@ -14,9 +14,9 @@ function pipeline(g: Grid, thresholdCells: number | null, p = DEFAULT_PARAMS) {
   const plain = fillDepressions(g, outlets);
   const { lakeId, lakes } = findLakes(g, plain, ocean, p);
   const surface = fillEpsilon(g.data, g, outlets);
-  const receivers = flowReceivers(surface, g, outlets);
+  const receivers = flowReceivers(surface, g, outlets, lakeId, lakes);
   const cs2 = g.cellSize * g.cellSize;
-  const acc = flowAccumulation(receivers, surface, cs2);
+  const acc = flowAccumulation(receivers, surface, cs2, lakeId);
   const thr = thresholdCells === null ? riverThreshold(p) : thresholdCells * cs2;
   const paths = extractNetwork(g, receivers, acc, lakeId, lakes, ocean, thr);
   return { paths, receivers, acc, lakeId, lakes, ocean };
@@ -100,6 +100,24 @@ describe('extractNetwork', () => {
     expect(out!.outlet.type).toBe('edge');
   });
 
+  test('flat-rim bowl gives exactly one outlet river starting at lake.spill', () => {
+    const { paths, lakes, lakeId, receivers } = pipeline(bowlGrid(100, 10, 100, 30), 500);
+    expect(lakes).toHaveLength(1);
+    const outs = paths.filter((p) => p.source.type === 'lake');
+    expect(outs).toHaveLength(1);
+    expect(outs[0].cells[0]).toBe(lakes[0].spill);
+    expect(receivers[lakes[0].spill]).toBeGreaterThanOrEqual(0);
+    expect(lakeId[receivers[lakes[0].spill]]).toBe(-1);
+    // every lake cell drains to the spill through lake cells only
+    for (let c = 0; c < lakeId.length; c++) {
+      if (lakeId[c] < 0) continue;
+      let cur = c;
+      let steps = 0;
+      while (lakeId[cur] >= 0 && steps++ < lakeId.length) cur = receivers[cur];
+      expect(cur).toBe(lakes[0].spill);
+    }
+  });
+
   test('river into lake stops at first lake cell', () => {
     const { paths, lakeId, lakes } = pipeline(tiltedWithPit(), 10);
     expect(lakes).toHaveLength(1);
@@ -138,8 +156,10 @@ describe('extractNetwork', () => {
 
   test.each([1, 2, 3])('fixture %i smoke: rivers follow receivers at rainfall 0.5', (s) => {
     const g = loadF32(`tests/fixtures/eroded_s${s}_512.f32`, 512, 20);
-    const { paths, receivers } = pipeline(g, null);
+    const { paths, receivers, lakes, lakeId } = pipeline(g, null);
     expect(paths.length).toBeGreaterThanOrEqual(1);
+    // a spill may drain into a different (downstream) lake, but never back into its own
+    for (const l of lakes) expect(receivers[l.spill] < 0 || lakeId[receivers[l.spill]] !== l.id).toBe(true);
     const n = 512 * 512;
     for (const p of paths) {
       expect(p.cells.length).toBeGreaterThanOrEqual(2);

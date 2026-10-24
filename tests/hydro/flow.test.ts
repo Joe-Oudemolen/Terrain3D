@@ -9,7 +9,7 @@ import { valueNoiseGrid } from '../helpers/synthetic';
 function route(g: Grid) {
   const outlets = outletMask(g, labelOcean(g));
   const surface = fillEpsilon(g.data, g, outlets);
-  const receivers = flowReceivers(surface, g, outlets);
+  const receivers = flowReceivers(surface, g, outlets, new Int32Array(g.width * g.height).fill(-1), []);
   const acc = flowAccumulation(receivers, surface, g.cellSize * g.cellSize);
   return { outlets, surface, receivers, acc };
 }
