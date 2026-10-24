@@ -88,6 +88,60 @@ test('R16 export has a range and .r16 tiles of 2 bytes per pixel', async () => {
   expect(world.r16Range.max).toBeGreaterThan(world.r16Range.min);
 });
 
+test('R16 tiles stay strictly inside the range (nothing clamped)', async () => {
+  const m = memorySink();
+  const res = await exportBundle(ctx, hydro, { ...P, heightFormat: 'r16' }, m.sink, { tiles: TILES });
+  expect(res.clampedPixels).toBe(0);
+  const files = unzipSync(concat(m.chunks));
+  for (const [x, z] of TILES) {
+    const b = files[`heights/height_x0${x}_z0${z}.r16`];
+    const v = new Uint16Array(b.buffer, b.byteOffset, b.length / 2);
+    let lo = 65535;
+    let hi = 0;
+    for (const q of v) {
+      if (q < lo) lo = q;
+      if (q > hi) hi = q;
+    }
+    expect(lo).toBeGreaterThan(0);
+    expect(hi).toBeLessThan(65535);
+  }
+});
+
+test('failing sink rejects and aborts the sink once', async () => {
+  const m = memorySink();
+  let aborts = 0;
+  const sink: ByteSink = {
+    write: () => Promise.reject(new Error('disk full')),
+    close: m.sink.close,
+    abort: async () => void aborts++,
+  };
+  await expect(exportBundle(ctx, hydro, P, sink, { tiles: TILES })).rejects.toThrow('disk full');
+  expect(aborts).toBe(1);
+});
+
+test('throwing onProgress rejects instead of hanging', async () => {
+  const m = memorySink();
+  await expect(
+    exportBundle(ctx, hydro, P, m.sink, {
+      tiles: TILES,
+      onProgress: () => {
+        throw new Error('ui broke');
+      },
+    }),
+  ).rejects.toThrow('ui broke');
+  expect(m.events).toEqual(['abort']);
+});
+
+test('pre-aborted signal rejects with AbortError and aborts the sink', async () => {
+  const m = memorySink();
+  const ac = new AbortController();
+  ac.abort();
+  await expect(exportBundle(ctx, hydro, P, m.sink, { tiles: TILES, signal: ac.signal })).rejects.toMatchObject({
+    name: 'AbortError',
+  });
+  expect(m.events).toEqual(['abort']);
+});
+
 test('abort aborts sink and rejects', async () => {
   const m = memorySink();
   const ac = new AbortController();

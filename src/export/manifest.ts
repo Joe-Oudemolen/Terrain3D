@@ -56,7 +56,7 @@ export function buildLakesJson(lakes: Lake[], terrain: Pick<Grid, 'width' | 'cel
   return {
     lakes: lakes.map((k) => ({
       id: k.id,
-      surface: k.surface,
+      surface: round3(k.surface),
       bounds: k.bounds,
       areaM2: k.areaM2,
       outline: k.outline,

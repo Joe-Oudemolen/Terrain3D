@@ -26,7 +26,7 @@ export type ExportRequest =
 
 export type ExportMessage =
   | { type: 'chunk'; data: Uint8Array }
-  | { type: 'tile' }
+  | { type: 'tile'; clamped: number }
   | { type: 'done' }
   | { type: 'error'; message: string };
 
@@ -72,10 +72,14 @@ ctx.onmessage = (e) => {
       const n = layout.tileSize;
       carveTile(h, layout, m.tx, m.tz, index);
       const mask = waterMaskTile(h, layout, m.tx, m.tz, index, lookup);
+      let clamped = 0;
+      if (format === 'r16') {
+        for (let i = 0; i < h.length; i++) if (!(h[i] >= r16!.min && h[i] <= r16!.max)) clamped++;
+      }
       const heights = format === 'exr' ? encodeExrFloat(h, n, n) : encodeR16(h, r16!);
       addFile(tileFileName('height', m.tx, m.tz, format), heights, true);
       addFile(tileFileName('water', m.tx, m.tz, 'png'), encodePngRgb(mask, n, n), false);
-      ctx.postMessage({ type: 'tile' });
+      ctx.postMessage({ type: 'tile', clamped });
     } else {
       const enc = new TextEncoder();
       for (const f of m.files) addFile(f.name, enc.encode(f.text), true);

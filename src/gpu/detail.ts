@@ -83,6 +83,9 @@ const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
 /** Peak detail amplitude (m) for a ruggedness value; also bounds the R16 export range. */
 export const detailAmplitude = (ruggedness: number): number => lerp(0.5, 4, ruggedness);
 
+/** Peak/amplitude ratio of the detail noise: the shader scales its normalised fBm by this (keep in sync with detail.wgsl). */
+export const DETAIL_PEAK = 1.4;
+
 /**
  * Full-res heights (meters, tileSize^2, row-major) for tile (tx, tz): bicubic base terrain plus
  * world-space fBm detail weighted by the bilinear detailMask.

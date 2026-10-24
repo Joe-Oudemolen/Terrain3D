@@ -1,7 +1,7 @@
 import { encodePreset, type TerrainParams } from '../core/params';
 import { tileLayout } from '../core/tiles';
 import type { GpuContext } from '../gpu/device';
-import { buildTileHeights, detailAmplitude, releaseTileCache } from '../gpu/detail';
+import { buildTileHeights, DETAIL_PEAK, detailAmplitude, releaseTileCache } from '../gpu/detail';
 import type { HydroResult } from '../hydro/hydrology';
 import godotScript from '../../godot/terrain3d_import.gd?raw';
 import type { ExportMessage, ExportRequest } from './export.worker';
@@ -28,8 +28,10 @@ function conservativeR16Range(hydro: HydroResult, p: TerrainParams): { min: numb
   }
   let maxDepth = 0;
   for (const r of hydro.rivers) for (const q of r.points) if (q.depth > maxDepth) maxDepth = q.depth;
-  const amp = detailAmplitude(p.ruggedness);
-  return r16Range(lo - maxDepth - amp, hi + amp);
+  const amp = detailAmplitude(p.ruggedness) * DETAIL_PEAK;
+  // Bicubic upsampling can overshoot the base min/max near sharp peaks and pits.
+  const overshoot = 0.1 * (hi - lo);
+  return r16Range(lo - maxDepth - amp - overshoot, hi + amp + overshoot);
 }
 
 /**
@@ -43,7 +45,7 @@ export async function exportBundle(
   p: TerrainParams,
   sink: ByteSink,
   opts: ExportOptions = {},
-): Promise<void> {
+): Promise<{ clampedPixels: number }> {
   const { signal, onProgress } = opts;
   const l = tileLayout(p.outputSpacing, p.tileSize);
   const tiles: [number, number][] = opts.tiles ?? [];
@@ -56,6 +58,7 @@ export async function exportBundle(
   let error: unknown = null;
   let inflight = 0;
   let completed = 0;
+  let clampedPixels = 0;
   let finished = false;
   let wake: (() => void) | null = null;
   const notify = () => {
@@ -86,17 +89,22 @@ export async function exportBundle(
       if (m.type === 'chunk') {
         chain = chain.then(() => (error ? undefined : sink.write(m.data))).catch(fail);
       } else if (m.type === 'tile') {
-        chain = chain.then(() => {
-          inflight--;
-          completed++;
-          onProgress?.(completed / (tiles.length + 1));
-          notify();
-        });
+        chain = chain
+          .then(() => {
+            inflight--;
+            completed++;
+            clampedPixels += m.clamped;
+            onProgress?.(completed / (tiles.length + 1));
+            notify();
+          })
+          .catch(fail);
       } else if (m.type === 'done') {
-        chain = chain.then(() => {
-          finished = true;
-          notify();
-        });
+        chain = chain
+          .then(() => {
+            finished = true;
+            notify();
+          })
+          .catch(fail);
       } else {
         fail(new Error(m.message));
       }
@@ -149,7 +157,9 @@ export async function exportBundle(
     await chain;
     check();
     await sink.close();
+    if (clampedPixels > 0) console.warn(`Export: ${clampedPixels} R16 pixels were clamped to the height range.`);
     onProgress?.(1);
+    return { clampedPixels };
   } catch (e) {
     await sink.abort().catch(() => undefined);
     throw e;
