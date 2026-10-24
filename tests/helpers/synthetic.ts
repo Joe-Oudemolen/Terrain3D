@@ -1,6 +1,14 @@
 import { readFileSync } from 'node:fs';
+import { expect } from 'vitest';
 import { makeGrid, type Grid } from '../../src/core/grid';
+import { clampParams, DEFAULT_PARAMS, type TerrainParams } from '../../src/core/params';
 import { deriveSeed, mulberry32 } from '../../src/core/rng';
+import { flowAccumulation, flowReceivers, resolveSpills, riverThreshold } from '../../src/hydro/flow';
+import { findLakes, type Lake } from '../../src/hydro/lakes';
+import { extractNetwork, type RiverPath } from '../../src/hydro/network';
+import { labelOcean, outletMask } from '../../src/hydro/ocean';
+import { fillDepressions, fillEpsilon } from '../../src/hydro/priorityFlood';
+import { buildRivers, type River } from '../../src/hydro/riverGeometry';
 
 /** Flat plateau at rimHeight with a smooth circular bowl (radius 30% of the grid) of the given depth in the centre. */
 export function bowlGrid(size: number, cellSize: number, rimHeight: number, depth: number): Grid {
@@ -67,4 +75,56 @@ export function loadF32(path: string, size: number, cellSize: number): Grid {
   }
   for (let i = 0; i < size * size; i++) g.data[i] = buf.readFloatLE(i * 4);
   return g;
+}
+
+export interface HydroRun {
+  rivers: River[];
+  paths: RiverPath[];
+  lakes: Lake[];
+  /** Pit-filled hydro terrain: epsilon-filled surface outside lakes, original height on lake cells. */
+  terrain: Grid;
+}
+
+/**
+ * Hydrology + river geometry on a heightmap: ocean, flood, lakes, flow, network, buildRivers.
+ * `thresholdCells` overrides the rainfall-derived channel threshold (in cells).
+ */
+export function hydroPipeline(g: Grid, p: TerrainParams, thresholdCells?: number): HydroRun {
+  const ocean = labelOcean(g);
+  const outlets = outletMask(g, ocean);
+  const plain = fillDepressions(g, outlets);
+  const { lakeId, lakes } = findLakes(g, plain, ocean, p);
+  const surface = fillEpsilon(g.data, g, outlets);
+  resolveSpills(lakes, lakeId, surface, g);
+  const receivers = flowReceivers(surface, g, outlets, lakeId, lakes);
+  const cs2 = g.cellSize * g.cellSize;
+  const acc = flowAccumulation(receivers, surface, cs2, lakeId);
+  const thr = thresholdCells === undefined ? riverThreshold(p) : thresholdCells * cs2;
+  const paths = extractNetwork(g, receivers, acc, lakeId, lakes, ocean, thr);
+  const terrain: Grid = { width: g.width, height: g.height, cellSize: g.cellSize, data: new Float32Array(surface) };
+  for (let c = 0; c < lakeId.length; c++) if (lakeId[c] >= 0) terrain.data[c] = g.data[c];
+  return { rivers: buildRivers(paths, terrain, lakes, p), paths, lakes, terrain };
+}
+
+/** 256 x 40 m (the full 10240 m world) value-noise terrain, 0..300 m lowered by 40 m so low borders become ocean. */
+export function syntheticTerrain(seed: number): Grid {
+  const g = valueNoiseGrid(seed, 256, 40, 300);
+  for (let i = 0; i < g.data.length; i++) g.data[i] -= 40;
+  return g;
+}
+
+export function pipelineOnSynthetic(seed: number, p: Partial<TerrainParams> = {}): River[] {
+  return hydroPipeline(syntheticTerrain(seed), clampParams({ ...DEFAULT_PARAMS, seed, ...p })).rivers;
+}
+
+/** Water never rises downstream: water[i+1] <= water[i] + tol along every river. */
+export function assertNeverUphill(rivers: River[], tol = 1e-4): void {
+  for (const r of rivers) {
+    for (let i = 1; i < r.points.length; i++) {
+      const rise = r.points[i].water - r.points[i - 1].water;
+      if (rise > tol) {
+        expect.fail(`river ${r.id} rises ${rise} m between points ${i - 1} and ${i}`);
+      }
+    }
+  }
 }
