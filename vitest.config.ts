@@ -13,6 +13,8 @@ export default defineConfig({
         },
       },
       {
+        // Pre-bundle so Vite does not reload the page mid-run when a test first imports it.
+        optimizeDeps: { include: ['fflate'] },
         test: {
           name: 'gpu',
           include: ['tests/**/*.gpu.test.ts'],

@@ -80,6 +80,9 @@ export function releaseTileCache(ctx: GpuContext): void {
 
 const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
 
+/** Peak detail amplitude (m) for a ruggedness value; also bounds the R16 export range. */
+export const detailAmplitude = (ruggedness: number): number => lerp(0.5, 4, ruggedness);
+
 /**
  * Full-res heights (meters, tileSize^2, row-major) for tile (tx, tz): bicubic base terrain plus
  * world-space fBm detail weighted by the bilinear detailMask.
@@ -116,7 +119,7 @@ export async function buildTileHeights(
   f32[8] = wx0;
   f32[9] = wz0;
   f32[10] = l.spacing;
-  f32[11] = lerp(0.5, 4, p.ruggedness);
+  f32[11] = detailAmplitude(p.ruggedness);
 
   const uniform = device.createBuffer({ size: 48, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
   const out = createStorage(ctx, n);

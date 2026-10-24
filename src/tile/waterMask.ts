@@ -14,7 +14,12 @@ export interface WaterLookup {
 
 const DILATE_CELLS = 2;
 
-export function makeWaterLookup(hydro: HydroResult): WaterLookup {
+/** The parts of a HydroResult the water lookup reads (the terrain only for its dimensions). */
+export type WaterLookupSource = Pick<HydroResult, 'lakes' | 'lakeId' | 'ocean'> & {
+  terrain: Pick<Grid, 'width' | 'height' | 'cellSize'>;
+};
+
+export function makeWaterLookup(hydro: WaterLookupSource): WaterLookup {
   const { width: w, height: hgt, cellSize: cs } = hydro.terrain;
   let ids = hydro.lakeId;
   // Dilate by DILATE_CELLS (4-neighbourhood per pass) so shore pixels see the lake's surface.
