@@ -19,30 +19,39 @@ struct Uniforms {
 @group(0) @binding(0) var<uniform> u: Uniforms;
 @group(0) @binding(1) var<storage, read_write> outH: array<f32>;
 
-const OCTAVES = 7;
+const OCTAVES = 5;
 
 @compute @workgroup_size(8, 8)
 fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
   if (gid.x >= u.size || gid.y >= u.size) { return; }
   let wpos = vec2<f32>(f32(gid.x), f32(gid.y)) * u.cell; // world meters
-  var p = wpos / u.baseWavelength + u.offset;
+  let q = wpos / u.baseWavelength + u.offset;
+  // Broad warped uplands establish the map's structure before local detail.
+  // Warping bends hill chains and valley corridors without uniformly roughening them.
+  let warp = vec2<f32>(gnoise(q * 0.35, u.seed + 7u), gnoise(q * 0.35 + vec2<f32>(19.1, 8.7), u.seed + 29u));
+  let p = q + warp * 0.9;
+  let regional = clamp(0.5 + gnoise(p * 0.45, u.seed + 71u), 0.0, 1.0);
+  let hills = clamp(0.5 + 0.85 * gnoise(p * 0.85, u.seed + 101u) + 0.15 * gnoise(p * 1.7, u.seed + 307u), 0.0, 1.0);
+  let upland = pow(smoothstep(0.23, 0.86, hills), 1.0 + u.flatExp * 0.4);
+  let ridge = pow(clamp(1.0 - abs(gnoise(p * 1.2, u.seed + 503u)) * 1.4142, 0.0, 1.0), 3.0);
+  var detailPos = p * 2.0;
   var amp = 1.0;
-  var smooth_sum = 0.0;
-  var ridge_sum = 0.0;
+  var detail = 0.0;
   var norm = 0.0;
   for (var o = 0; o < OCTAVES; o++) {
-    let n = gnoise(p, u.seed + u32(o) * 101u) * 1.4142;
-    smooth_sum += amp * n;
-    let r = 1.0 - abs(n);
-    ridge_sum += amp * r * r;
+    detail += amp * gnoise(detailPos, u.seed + 907u + u32(o) * 101u);
     norm += amp;
     amp *= u.gain;
-    p = p * 2.0 + vec2<f32>(17.3, 9.1);
+    detailPos = detailPos * 2.0 + vec2<f32>(17.3, 9.1);
   }
-  let smooth01 = clamp(smooth_sum / norm * 0.5 + 0.5, 0.0, 1.0);
-  let ridge01 = clamp(ridge_sum / norm, 0.0, 1.0);
-  var n = mix(smooth01, ridge01, u.ridgeMix);
-  n = pow(n, u.flatExp);
+  let grade = 0.065 * (1.0 - wpos.y / u.world);
+  var n = 0.015 + grade + 0.09 * regional;
+  n += upland * (0.48 + 0.22 * regional + 0.22 * u.ridgeMix * ridge);
+  // Lower rolling foothills break up broad corridors without filling them with sharp ridges.
+  let foothills = clamp(0.5 + 0.8 * gnoise(p * 2.1, u.seed + 601u), 0.0, 1.0);
+  n += 0.055 * foothills * foothills * (0.35 + 0.65 * upland);
+  n += detail / norm * (0.018 + 0.10 * u.gain) * upland * upland;
+  n = clamp(n, 0.0, 1.0);
   if (u.island != 0u) {
     let d = min(min(wpos.x, wpos.y), min(u.world - wpos.x, u.world - wpos.y));
     let s = smoothstep(0.0, u.coastWidth, d);

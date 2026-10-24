@@ -7,6 +7,17 @@ import { assertNeverUphill, loadF32 } from '../helpers/synthetic';
 const fixtures = [1, 2, 3].map((s) => loadF32(`tests/fixtures/eroded_s${s}_512.f32`, 512, 20));
 
 describe('runHydrology', () => {
+  test('all interior wet lakes on fixtures have a visible downstream outlet even at low rainfall', () => {
+    for (const f of fixtures) {
+      const h = runHydrology(f, clampParams({ rainfall: 0.05 }));
+      for (const lake of h.lakes) {
+        const x = lake.spill % f.width, z = Math.floor(lake.spill / f.width);
+        if (h.lakeId[lake.spill] >= 0 || h.ocean[lake.spill] || x === 0 || z === 0 || x === f.width - 1 || z === f.height - 1) continue;
+        expect(h.rivers.some(r => r.source.type === 'lake' && r.source.id === lake.id), `lake ${lake.id} at ${lake.surface} m needs an outlet`).toBe(true);
+      }
+      assertNeverUphill(h.rivers);
+    }
+  });
   test('never uphill on real eroded fixtures x settings', () => {
     for (const f of fixtures) {
       for (const rainfall of [0.2, 0.5, 0.9]) {

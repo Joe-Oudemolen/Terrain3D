@@ -9,6 +9,30 @@ import commonSrc from '../../src/gpu/wgsl/common.wgsl?raw';
 
 const ctx = await initGpu();
 
+test('default hills are dominated by broad landforms rather than pixel-scale ridges', async () => {
+  const g = await generateTerrain(ctx, DEFAULT_PARAMS, 256);
+  let lap = 0, count = 0, lo = Infinity, hi = -Infinity;
+  for (const h of g.data) { lo = Math.min(lo, h); hi = Math.max(hi, h); }
+  for (let z = 1; z < 255; z++) for (let x = 1; x < 255; x++) {
+    const i = z * 256 + x;
+    lap += Math.abs(g.data[i] - (g.data[i - 1] + g.data[i + 1] + g.data[i - 256] + g.data[i + 256]) / 4); count++;
+  }
+  expect(lap / count / (hi - lo)).toBeLessThan(0.0012);
+});
+
+test('larger feature scale produces broader terrain features', async () => {
+  const slope = (g: ReturnType<typeof makeGrid>) => {
+    let sum = 0;
+    for (let z = 0; z < g.height - 1; z++) for (let x = 0; x < g.width - 1; x++) {
+      const i = z * g.width + x; sum += Math.abs(g.data[i + 1] - g.data[i]) + Math.abs(g.data[i + g.width] - g.data[i]);
+    }
+    return sum / g.data.length;
+  };
+  const small = await generateTerrain(ctx, { ...DEFAULT_PARAMS, featureScale: 1 }, 256);
+  const large = await generateTerrain(ctx, { ...DEFAULT_PARAMS, featureScale: 8 }, 256);
+  expect(slope(large)).toBeLessThan(slope(small) * 0.5);
+});
+
 test('same seed gives identical heights', async () => {
   const a = await generateTerrain(ctx, DEFAULT_PARAMS, 256);
   const b = await generateTerrain(ctx, DEFAULT_PARAMS, 256);

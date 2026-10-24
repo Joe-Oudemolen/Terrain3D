@@ -8,14 +8,18 @@ test('panel restores presets, constrains tiles, and disables coastline unless is
   const host = document.createElement('div'); document.body.append(host);
   const p = { ...DEFAULT_PARAMS };
   let changedKey = '';
+  let reset = false;
   const panel = createPanel(host, p, {
     onChange(_p, key) { changedKey = key; }, onGenerate() {}, onCancel() {}, onExport() {}, onRandomSeed() {}, onCopyPreset() {}, onPastePreset() {},
+    onResetDefaults() { reset = true; },
   });
   expect(host.textContent).toContain('Terrain');
   expect(panel.coastlineDisabled()).toBe(true);
   host.querySelector<HTMLInputElement>('input[type="checkbox"]')!.click();
   expect(changedKey).toBe('island');
   expect(panel.coastlineDisabled()).toBe(false);
+  [...host.querySelectorAll('button')].find(b => b.textContent === 'Reset defaults')!.click();
+  expect(reset).toBe(true);
   panel.setParams({ ...p, island: true, outputSpacing: 2, tileSize: 2048 });
   expect(p.tileSize).toBe(1024);
   expect(panel.coastlineDisabled()).toBe(false);

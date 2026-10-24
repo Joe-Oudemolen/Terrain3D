@@ -5,6 +5,7 @@ export interface PanelHandlers {
   onChange(p: TerrainParams, key: keyof TerrainParams): void;
   onGenerate(): void; onCancel(): void; onExport(): void;
   onRandomSeed(): void; onCopyPreset(): void; onPastePreset(s: string): void;
+  onResetDefaults(): void;
 }
 
 export function createPanel(container: HTMLElement, params: TerrainParams, handlers: PanelHandlers) {
@@ -50,6 +51,7 @@ export function createPanel(container: HTMLElement, params: TerrainParams, handl
   const cancel = pane.addButton({ title: 'Cancel', hidden: true }); cancel.on('click', handlers.onCancel);
   const presets = pane.addFolder({ title: 'Presets', expanded: false });
   presets.addButton({ title: 'Copy preset' }).on('click', handlers.onCopyPreset);
+  pane.addButton({ title: 'Reset defaults' }).on('click', handlers.onResetDefaults);
   const preset = document.createElement('textarea');
   preset.placeholder = 'Paste a preset here'; preset.setAttribute('aria-label', 'Preset string');
   const apply = document.createElement('button'); apply.textContent = 'Apply preset';

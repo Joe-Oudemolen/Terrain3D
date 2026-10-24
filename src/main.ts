@@ -1,13 +1,13 @@
 import './style.css';
 import { Pipeline, type PipelineResult } from './app/pipeline';
-import { decodePreset, encodePreset, loadSavedParams, saveParams } from './core/params';
+import { DEFAULT_PARAMS, decodePreset, encodePreset, loadSavedParams, saveParams } from './core/params';
 import { initGpu, WebGpuUnavailableError } from './gpu/device';
 import { generateTerrain } from './gpu/terrain';
 import { erode } from './gpu/erosion';
 import { runHydrologyInWorker } from './hydro/client';
 import { openSaveSink } from './export/sink';
 import { exportBundle } from './export/exporter';
-import { colorizeTerrain } from './ui/colorize';
+import { colorizeTerrain, colorizeViewport } from './ui/colorize';
 import { createViewport } from './ui/viewport';
 import { createMinimap } from './ui/minimap';
 import { createPanel } from './ui/panel';
@@ -55,6 +55,11 @@ async function main() {
     },
     onGenerate: () => { void pipeline.generate(params); },
     onCancel: () => pipeline.cancel(),
+    onResetDefaults() {
+      pipeline.reset(); generated = false;
+      panel.setParams({ ...DEFAULT_PARAMS }); saveParams(params); panel.setBusy(false, false);
+      pipeline.preview(params); status.notice('Default settings restored. Press Generate for erosion and water.');
+    },
     onExport: () => { void pipeline.export(params); },
     onRandomSeed() {
       params.seed = crypto.getRandomValues(new Uint32Array(1))[0]; panel.setParams(params); saveParams(params); pipeline.preview(params);
@@ -74,7 +79,7 @@ async function main() {
   pipeline.onResult((r) => {
     result = r;
     const grid = r.hydro?.terrain ?? r.base;
-    viewport.setTerrain(grid, colorizeTerrain(grid, r.hydro)); renderMap();
+    viewport.setTerrain(grid, colorizeViewport(grid, r.hydro)); renderMap();
     generated ||= r.kind === 'generate'; panel.setBusy(false, generated);
     label.textContent = r.kind === 'generate' ? `Generated · seed ${r.params.seed} · ${r.hydro!.rivers.length} rivers · ${r.hydro!.lakes.length} lakes` : `Rough preview · seed ${r.params.seed} · press Generate for erosion and water`;
   });

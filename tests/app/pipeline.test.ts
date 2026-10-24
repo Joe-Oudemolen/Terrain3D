@@ -63,6 +63,26 @@ beforeEach(() => vi.useFakeTimers());
 afterEach(() => vi.useRealTimers());
 
 describe('Pipeline', () => {
+  test('reset during export discards deferred generation and invalidates the previous export result', async () => {
+    let exports = 0;
+    let release!: (value: { clampedPixels: number }) => void;
+    const r = rig(0, { exportBundle: async () => {
+      exports++;
+      return new Promise<{ clampedPixels: number }>(resolve => { release = resolve; });
+    } });
+    await r.pl.generate({ ...P, seed: 7 });
+    const running = r.pl.export();
+    await vi.advanceTimersByTimeAsync(0);
+    await r.pl.generate({ ...P, seed: 99 });
+    r.pl.reset();
+    r.pl.preview(P);
+    release({ clampedPixels: 0 }); await running;
+    await vi.advanceTimersByTimeAsync(200);
+    expect(r.results.map(result => [result.kind, result.params.seed])).toEqual([['generate', 7], ['preview', P.seed]]);
+    await r.pl.export();
+    expect(exports).toBe(1);
+    expect(r.states.at(-1)).toEqual({ kind: 'idle' });
+  });
   test('export uses current output options but retains the generated terrain parameters', async () => {
     let exported: typeof P | undefined;
     const r = rig(0, { exportBundle: async (_ctx, _hydro, p) => { exported = p; return { clampedPixels: 0 }; } });

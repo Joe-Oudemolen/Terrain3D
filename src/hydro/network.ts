@@ -44,7 +44,17 @@ export function extractNetwork(
 ): RiverPath[] {
   const n = g.width * g.height;
   if (!Number.isFinite(threshold)) return [];
-  const isChannel = (c: number) => acc[c] >= threshold && lakeId[c] < 0 && !ocean[c];
+  // A wet lake has a visible outlet even when its catchment is too small to
+  // cross the ordinary spring threshold. Keep the entire receiver route.
+  const lakeDrain = new Uint8Array(n);
+  for (const lake of lakes) {
+    let c = lake.spill;
+    while (c >= 0 && !lakeDrain[c] && lakeId[c] < 0 && !ocean[c]) {
+      lakeDrain[c] = 1;
+      c = receivers[c];
+    }
+  }
+  const isChannel = (c: number) => (acc[c] >= threshold || lakeDrain[c] !== 0) && lakeId[c] < 0 && !ocean[c];
 
   // Main (largest) channel inflow per cell; ascending scan keeps the lowest index on ties.
   const main = new Int32Array(n).fill(-1);
@@ -93,6 +103,13 @@ export function extractNetwork(
       if (lakeId[r] >= 0) {
         cells.push(r);
         outlet = { type: 'lake', id: lakeId[r] };
+        break;
+      }
+      // A boundary spill has no in-world outlet segment of its own. Its singleton
+      // head will be dropped below, so upstream water must terminate at the edge.
+      if (main[r] === -2 && receivers[r] < 0) {
+        cells.push(r);
+        outlet = { type: 'edge' };
         break;
       }
       if (main[r] === cur) {

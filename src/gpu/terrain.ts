@@ -34,8 +34,8 @@ export async function generateTerrain(ctx: GpuContext, p: TerrainParams, size: n
   f32[3] = WORLD_SIZE_M;
   f32[4] = rnd() * 1000; // noise-space offset x
   f32[5] = rnd() * 1000; // noise-space offset y
-  f32[6] = WORLD_SIZE_M / p.featureScale; // base wavelength, m
-  f32[7] = 0.3 + 0.4 * p.ruggedness; // fBm gain
+  f32[6] = p.featureScale * 1000; // larger km values mean broader features
+  f32[7] = 0.24 + 0.24 * p.ruggedness; // fine relief decays quickly in the lowlands
   f32[8] = p.ridgeSharpness;
   f32[9] = 1 + 2 * p.flatland;
   f32[10] = p.seaLevel;

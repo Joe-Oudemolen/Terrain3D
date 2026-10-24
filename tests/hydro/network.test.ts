@@ -55,6 +55,42 @@ function tiltedWithPit(): Grid {
 }
 
 describe('extractNetwork', () => {
+  test('a lake draining to another lake spill at the world edge keeps a valid terminal outlet', () => {
+    const g: Grid = { width: 3, height: 2, cellSize: 100, data: new Float32Array(6) };
+    const lakes = [2, 3].map((spill, id) => ({ id, spill } as Lake));
+    const paths = extractNetwork(g, new Int32Array([-1, -1, 3, -1, 2, 3]), new Float32Array([1, 1, 2, 4, 1, 1]), new Int32Array([-1, -1, -1, -1, 0, 1]), lakes, new Uint8Array(6), 100);
+    expect(paths).toHaveLength(1);
+    expect(paths[0].source).toEqual({ type: 'lake', id: 0 });
+    expect(paths[0].outlet).toEqual({ type: 'edge' });
+    expect(paths[0].cells).toEqual([2, 3]);
+  });
+  test('two small elevated lakes connect from the higher lake to the lower lake and onward', () => {
+    const g = makeGrid(61, 100);
+    for (let z = 0; z < 61; z++) for (let x = 0; x < 61; x++) {
+      let height = 200 + 2 * z + 4 * Math.abs(x - 30);
+      if (x >= 27 && x <= 33 && ((z >= 14 && z <= 20) || (z >= 34 && z <= 40))) height -= 30;
+      g.data[z * 61 + x] = height;
+    }
+    const { lakes, paths } = pipeline(g, 10000);
+    expect(lakes).toHaveLength(2);
+    const sorted = [...lakes].sort((a, b) => b.surface - a.surface);
+    const high = paths.find(p => p.source.type === 'lake' && p.source.id === sorted[0].id);
+    const low = paths.find(p => p.source.type === 'lake' && p.source.id === sorted[1].id);
+    expect(high?.outlet).toEqual({ type: 'lake', id: sorted[1].id });
+    expect(low?.outlet.type).toBe('edge');
+  });
+  test('wet lake outlet reaches lower drainage even when the lake catchment is below the river threshold', () => {
+    const { paths, lakes, receivers, lakeId } = pipeline(tiltedWithPit(), 2000);
+    expect(lakes.length).toBeGreaterThan(0);
+    for (const lake of lakes) {
+      if (receivers[lake.spill] < 0 || lakeId[lake.spill] >= 0) continue;
+      const outlet = paths.find(p => p.source.type === 'lake' && p.source.id === lake.id);
+      expect(outlet, `lake ${lake.id} needs a continuous outlet`).toBeDefined();
+      expect(outlet!.cells[0]).toBe(lake.spill);
+      expect(['edge', 'lake', 'ocean', 'river']).toContain(outlet!.outlet.type);
+      for (let i = 1; i < outlet!.cells.length; i++) expect(receivers[outlet!.cells[i - 1]]).toBe(outlet!.cells[i]);
+    }
+  });
   test('no rivers when rainfall = 0', () => {
     const { paths } = pipeline(vValley(), null, { ...DEFAULT_PARAMS, rainfall: 0 });
     expect(paths).toEqual([]);

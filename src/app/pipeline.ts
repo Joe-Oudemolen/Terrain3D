@@ -109,6 +109,16 @@ export class Pipeline {
     await request();
   }
 
+  /** Reset also forgets generated output and pending work; cancel alone preserves both. */
+  reset(): void {
+    this.deferred = null;
+    this.last = null;
+    this.lastRequest = null;
+    const wasBusy = this.busy !== null;
+    this.cancel();
+    if (!wasBusy) this.emit({ kind: 'idle' });
+  }
+
   cancel(): void {
     if (this.timer) clearTimeout(this.timer);
     this.timer = null;

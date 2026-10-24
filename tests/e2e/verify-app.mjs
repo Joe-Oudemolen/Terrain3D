@@ -33,6 +33,11 @@ try {
   await page.getByRole('button', { name: 'Apply preset', exact: true }).click();
   await page.getByText("That preset couldn't be read", { exact: true }).waitFor();
   await page.getByRole('button', { name: 'Dismiss notice' }).click();
+  await page.getByRole('button', { name: 'Reset defaults', exact: true }).click();
+  await page.waitForFunction(() => document.querySelector('#result-label')?.textContent?.startsWith('Rough preview'));
+  assert.equal(await page.getByRole('button', { name: 'Export bundle', exact: true }).isDisabled(), true);
+  assert.equal(await page.evaluate(() => JSON.parse(atob(localStorage.getItem('terrain-gen:params').replace(/-/g, '+').replace(/_/g, '/'))).mountainHeight), 650);
+  await page.getByRole('button', { name: 'Dismiss notice' }).click();
   start = performance.now();
   await page.getByRole('button', { name: 'Generate terrain', exact: true }).click();
   await page.waitForFunction(() => document.querySelector('#result-label')?.textContent?.startsWith('Generated'), { timeout: 240000 });
@@ -42,6 +47,23 @@ try {
   await page.getByRole('button', { name: 'Water off', exact: true }).click();
   await mkdir('test-results', { recursive: true });
   await page.screenshot({ path: 'test-results/app.png' });
+  if (process.env.TERRAIN_REVIEW_SEEDS === '1') {
+    timings.seedReview = [];
+    for (const seed of [2, 3]) {
+      const preset = await page.evaluate((seed) => {
+        const raw = localStorage.getItem('terrain-gen:params');
+        const p = JSON.parse(atob(raw.replace(/-/g, '+').replace(/_/g, '/')));
+        return btoa(JSON.stringify({ ...p, seed }));
+      }, seed);
+      await page.getByRole('textbox', { name: 'Preset string' }).fill(preset);
+      await page.getByRole('button', { name: 'Apply preset', exact: true }).click();
+      await page.waitForFunction(seed => document.querySelector('#result-label')?.textContent?.startsWith(`Rough preview · seed ${seed}`), seed);
+      await page.getByRole('button', { name: 'Generate terrain', exact: true }).click();
+      await page.waitForFunction(seed => document.querySelector('#result-label')?.textContent?.startsWith(`Generated · seed ${seed}`), seed);
+      timings.seedReview.push(await page.locator('#result-label').textContent());
+      await page.screenshot({ path: `test-results/app-seed-${seed}.png` });
+    }
+  }
   if (process.env.TERRAIN_PERF === '1') {
     await page.evaluate(() => {
       let last = performance.now();
@@ -72,6 +94,10 @@ try {
     await page.waitForFunction(() => document.querySelector('#result-label')?.textContent?.startsWith('Rough preview'));
     assert.equal(await page.evaluate(() => JSON.parse(atob(localStorage.getItem('terrain-gen:params').replace(/-/g, '+').replace(/_/g, '/'))).baseQuality), 4096);
   }
+  assert.equal(await page.getByRole('button', { name: 'Export bundle', exact: true }).isDisabled(), process.env.TERRAIN_PERF === '1');
+  await page.getByRole('button', { name: 'Reset defaults', exact: true }).click();
+  await page.waitForFunction(() => document.querySelector('#result-label')?.textContent?.startsWith('Rough preview · seed 1'));
+  assert.equal(await page.getByRole('button', { name: 'Export bundle', exact: true }).isDisabled(), true);
   assert.deepEqual(errors, []);
   await writeFile('test-results/app-verification.json', JSON.stringify({ timings, errors }, null, 2));
   console.log(JSON.stringify({ timings, errors }));

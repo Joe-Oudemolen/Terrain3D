@@ -13,12 +13,19 @@ import { buildChannelFloor } from '../../src/tile/channelFloor';
 for (const seed of [1, 2, 3, 4, 5, 6]) for (const island of (seed === 6 ? [true] : [false, true])) {
   test(`full pipeline seed ${seed}, island ${island}: water and exported bed descend`, async () => {
     const ctx = await initGpu();
-    const p = { ...DEFAULT_PARAMS, seed, island, mountainHeight: seed === 6 ? 3000 : 1200, riverWidth: seed === 6 ? 0.25 : 1, outputSpacing: seed === 6 ? 1 as const : 2 as const };
+    const p = { ...DEFAULT_PARAMS, seed, island, mountainHeight: seed === 6 ? 3000 : DEFAULT_PARAMS.mountainHeight, riverWidth: seed === 6 ? 0.25 : DEFAULT_PARAMS.riverWidth, outputSpacing: seed === 6 ? 1 as const : 2 as const };
     const started = performance.now();
     try {
       const base = await generateTerrain(ctx, p, 2048);
       const eroded = await erode(ctx, base, p);
       const hydro = await runHydrologyInWorker(eroded, p);
+      for (const lake of hydro.lakes) {
+        const x = lake.spill % eroded.width, z = Math.floor(lake.spill / eroded.width);
+        if (hydro.lakeId[lake.spill] >= 0 || hydro.ocean[lake.spill] || x === 0 || z === 0 || x === eroded.width - 1 || z === eroded.height - 1) continue;
+        const outlet = hydro.rivers.find(r => r.source.type === 'lake' && r.source.id === lake.id);
+        expect(outlet, `lake ${lake.id} needs a visible outlet`).toBeDefined();
+        expect(outlet!.points[0].water).toBeCloseTo(lake.surface, 4);
+      }
       const generated = performance.now();
       const layout = tileLayout(p.outputSpacing, 1024);
       const idx = buildRiverIndex(hydro.rivers);

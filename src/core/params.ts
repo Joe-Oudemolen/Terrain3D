@@ -24,11 +24,11 @@ export interface TerrainParams {
 
 export const DEFAULT_PARAMS: TerrainParams = {
   seed: 1,
-  mountainHeight: 1200,
-  ruggedness: 0.5,
-  ridgeSharpness: 0.6,
-  featureScale: 3,
-  flatland: 0.3,
+  mountainHeight: 650,
+  ruggedness: 0.32,
+  ridgeSharpness: 0.25,
+  featureScale: 4,
+  flatland: 0.5,
   erosionStrength: 0.5,
   erosionDuration: 0.5,
   sedimentDeposition: 0.5,

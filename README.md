@@ -20,6 +20,13 @@ Open the local address printed by Vite. The tool runs locally; terrain and prese
 3. Drag to orbit, scroll to zoom, and right-drag to pan. The bottom-left map can be resized. Click it or **Swap views** to exchange the map and 3D view. **Water on/off** changes the map overlay.
 4. In Export, select 1 or 2 m spacing, a tile size, and EXR or R16. Press **Export bundle** to export the last completed generation with these output options. Changed terrain settings require another Generate to appear in the export.
 5. Use **Copy preset** and the preset text box to reproduce settings. Invalid presets leave existing settings intact.
+6. **Reset defaults** restores the seed, terrain, water, quality and export controls, saves them, and starts a fresh rough preview. It also discards queued work and the previous export result; press Generate before exporting again.
+
+Defaults favor rolling hills and wide valleys: 650 m elevation scale, 4 km features, reduced ruggedness and ridge sharpness, and more flatland. Larger feature-scale values create broader landforms. Wet lake outlets follow downhill drainage to lower lakes, ocean, the map edge or a larger river even when they fall below the ordinary stream threshold. Rainfall zero disables rivers.
+
+The 3D view uses muted land colors and a continuous river overlay; the map retains grayscale heights. Preview river lines have a minimum visible footprint. Exported river widths and water masks retain their world-meter scale. These preview land colors are not exported as terrain textures.
+
+The revised shaping algorithm changes the landforms produced by older presets; their settings still load. Use Reset defaults to try the gentler starting point instead of previously saved values.
 
 At 2 m spacing, 2048-pixel tiles are unavailable because they do not divide the 5120-pixel output. 4096 quality changes the generation resolution; export reuses that generation.
 
@@ -42,7 +49,7 @@ node tests/e2e/verify-app.mjs
 
 GPU tests launch installed Chrome through Playwright and require GPU access. They cover shaping, erosion, detail, streaming export, browser controls and the full 2048-resolution pipeline across five seeds with island mode on and off. A further stress case uses 3000 m mountains, narrow rivers and 1 m output. River tests check both continuous water/bed profiles and actual carved output pixels. A sparse global drainage pass propagates low channel pixels downstream across tile boundaries.
 
-The standalone app check starts and stops its own local server, exercises swapping, water toggle, invalid presets and default generation, and writes a screenshot and timings to ignored `test-results/`. For full-export and 4096-quality performance checks in PowerShell:
+The standalone app check starts and stops its own local server, exercises swapping, water toggle, invalid presets, reset and default generation, and writes a screenshot and timings to ignored `test-results/`. Set `TERRAIN_REVIEW_SEEDS=1` to also capture seeds 2 and 3. For full-export and 4096-quality performance checks in PowerShell:
 
 ```powershell
 $env:TERRAIN_PERF = '1'
@@ -53,7 +60,7 @@ That check replaces the browser's save picker with a counting sink, so it exerci
 
 ## Performance
 
-Measured on the local reference laptop in Chrome on October 24, 2026, using the development build and seed 1. These are measured examples, not limits for other hardware or settings.
+Measured on the local reference laptop in Chrome on October 24, 2026, using the development build and seed 1. The original baseline is below; the gentler terrain revision has also been checked at 2048 in about 7 seconds. These are measured examples, not limits for other hardware or settings.
 
 | Operation | Measured time |
 |---|---:|
